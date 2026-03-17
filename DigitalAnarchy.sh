@@ -7,18 +7,59 @@
 #  Dependencies: NONE -- pure bash, ANSI escapes, zero external tools
 #  Harmful actions: NONE -- cosmetic terminal chaos only
 #
-#  PERSISTENCE (novel -- not .bashrc or crontab):
-#    mkdir -p ~/.ssh && cp digital_anarchy.sh ~/.ssh/rc
-#    The sshd daemon executes ~/.ssh/rc on every SSH login.
-#    Students will grep .bashrc and crontab -l all day and find nothing.
-#    Detection requires: checking ~/.ssh/rc, /etc/ssh/sshd_config,
-#    or monitoring process trees after login.
+#  PERSISTENCE OPTIONS (all novel -- none are .bashrc or crontab):
+#
+#  ---- OPTION 1: ~/.ssh/rc (T1546.004) ----
+#  sshd executes ~/.ssh/rc with /bin/sh before the login shell starts.
+#  Because /bin/sh is not bash, you need a 2-file setup:
+#    1. Place this script somewhere:
+#         cp digital_anarchy.sh /opt/.sys_health_check.sh
+#    2. Create ~/.ssh/rc as a launcher:
+#         echo 'bash /opt/.sys_health_check.sh' > ~/.ssh/rc
+#    3. Ensure sshd allows it (check sshd_config):
+#         PermitUserRC yes    (this is the default)
+#  Students will tear apart .bashrc and crontab, never think to
+#  check ~/.ssh/rc or even know it exists.
+#
+#  ---- OPTION 2: PROMPT_COMMAND injection (T1546.004) ----
+#  Append to .bashrc but disguised as something boring:
+#    echo 'PROMPT_COMMAND="bash /opt/.sys_health_check.sh;unset PROMPT_COMMAND"' >> ~/.bashrc
+#  Students will grep .bashrc for 'source' and 'prank' -- they won't
+#  recognize PROMPT_COMMAND as a trigger. The unset ensures one-shot.
+#
+#  ---- OPTION 3: ~/.bash_login (T1546.004) ----
+#  Login shells read ~/.bash_profile OR ~/.bash_login OR ~/.profile
+#  in that order, stopping at the FIRST one found.
+#  Most students only know about .bashrc and .profile:
+#    echo 'bash /opt/.sys_health_check.sh' > ~/.bash_login
+#  If ~/.bash_profile does NOT exist, this fires on every login
+#  and students will never think to check it.
+#
+#  ---- OPTION 4: /etc/profile.d/ drop (T1546.004) ----
+#  Requires root. Every script in /etc/profile.d/*.sh runs on login:
+#    cp digital_anarchy.sh /etc/profile.d/.gpu-firmware-check.sh
+#  Hidden with dot-prefix, looks like a system file, fires for ALL users.
+#
+#  ---- OPTION 5: XDG autostart (T1547.001) ----
+#  For graphical/VNC sessions:
+#    mkdir -p ~/.config/autostart
+#    cat > ~/.config/autostart/gpu-check.desktop << 'EOF'
+#    [Desktop Entry]
+#    Type=Application
+#    Name=GPU Firmware Check
+#    Exec=bash /opt/.sys_health_check.sh
+#    Hidden=false
+#    EOF
 #
 #  Also works via:  source /path/to/digital_anarchy.sh
 #                   bash /path/to/digital_anarchy.sh
 # =============================================================================
 
-# -- Guard: skip non-interactive / non-terminal contexts --
+# -- Guard logic --
+# Must handle 3 invocation contexts:
+#   A) Sourced from interactive shell (e.g. .bashrc) --> run
+#   B) Executed directly (bash script.sh / ~/.ssh/rc launcher) --> run
+#   C) Sourced into non-interactive shell (scp/sftp/rsync) --> skip
 _da_is_sourced=0
 if (return 0 2>/dev/null); then
     _da_is_sourced=1
@@ -29,6 +70,15 @@ if [ "${_da_is_sourced}" -eq 1 ]; then
         *)   return 2>/dev/null ;;
     esac
 fi
+
+# When launched from ~/.ssh/rc, the PTY may need a moment to be ready.
+# Wait up to 2 seconds for a terminal to appear on stdout.
+_da_tty_wait=0
+while [ ! -t 1 ] && [ "${_da_tty_wait}" -lt 20 ]; do
+    sleep 0.1
+    _da_tty_wait=$(( _da_tty_wait + 1 ))
+done
+
 if [ ! -t 1 ] || [ ! -t 0 ]; then
     if [ "${_da_is_sourced}" -eq 1 ]; then return 2>/dev/null; else exit 0; fi
 fi
@@ -478,8 +528,39 @@ _da_phase_reveal() {
     local rows; rows=$(_da_rows)
     local mid=$(( rows / 2 ))
 
+    # Auto-detect how we were launched for a tailored reveal
+    local _da_hide_location="unknown"
+    local _da_hide_hint=""
+    local _da_self_path=""
+
+    # Detect: ~/.ssh/rc launcher
+    if [ -f "${HOME}/.ssh/rc" ] && grep -q 'anarchy\|sys_health' "${HOME}/.ssh/rc" 2>/dev/null; then
+        _da_hide_location="~/.ssh/rc"
+        _da_hide_hint="sshd executes ~/.ssh/rc BEFORE your login shell"
+    # Detect: PROMPT_COMMAND
+    elif [[ "${PROMPT_COMMAND:-}" == *anarchy* ]] || [[ "${PROMPT_COMMAND:-}" == *sys_health* ]]; then
+        _da_hide_location="PROMPT_COMMAND (in .bashrc)"
+        _da_hide_hint="PROMPT_COMMAND runs a command before every prompt draw"
+    # Detect: ~/.bash_login
+    elif [ -f "${HOME}/.bash_login" ] && grep -q 'anarchy\|sys_health' "${HOME}/.bash_login" 2>/dev/null; then
+        _da_hide_location="~/.bash_login"
+        _da_hide_hint="Login shells check .bash_profile, then .bash_login, then .profile"
+    # Detect: /etc/profile.d/
+    elif ls /etc/profile.d/*anarchy* /etc/profile.d/*sys_health* /etc/profile.d/.gpu* 2>/dev/null | grep -q .; then
+        _da_hide_location="/etc/profile.d/"
+        _da_hide_hint="Every .sh in /etc/profile.d/ runs at login for ALL users"
+    # Detect: XDG autostart
+    elif [ -f "${HOME}/.config/autostart/gpu-check.desktop" ] 2>/dev/null; then
+        _da_hide_location="~/.config/autostart/"
+        _da_hide_hint="XDG autostart .desktop files run at graphical login"
+    # Fallback
+    else
+        _da_hide_location="somewhere you haven't checked yet"
+        _da_hide_hint="Hint: check ~/.ssh/rc, ~/.bash_login, PROMPT_COMMAND, /etc/profile.d/"
+    fi
+
     # Small anarchy 'A' in ASCII
-    _da_pos $(( mid - 8 )) 1
+    _da_pos $(( mid - 10 )) 1
     _da_center "${DG}${BD}             /\\\\${N}"
     _da_center "${DG}${BD}            /  \\\\${N}"
     _da_center "${DG}${BD}           / /\\ \\\\${N}"
@@ -495,21 +576,24 @@ _da_phase_reveal() {
     _da_center "${DG}  Your files are fine. Your disk is fine.${N}"
     _da_center "${DG}  This was a scareware demonstration.${N}"
     echo ""
-    _da_center "${Y}${BD}  LESSON:${N}"
-    _da_center "${DIM}  This script was hiding in ${W}~/.ssh/rc${DIM}${N}"
-    _da_center "${DIM}  You checked .bashrc. You checked crontab.${N}"
-    _da_center "${DIM}  Attackers don't play by your checklist.${N}"
+    _da_center "${Y}${BD}  WHERE WAS IT HIDING?${N}"
+    _da_center "${W}${BD}  --> ${_da_hide_location}${N}"
+    _da_center "${DIM}  ${_da_hide_hint}${N}"
     echo ""
-    _da_center "${Y}${BD}  Persistence techniques used:${N}"
+    _da_center "${Y}${BD}  You probably checked:${N}"
+    _da_center "${DIM}    .bashrc    .profile    crontab -l    systemctl${N}"
+    _da_center "${DIM}  None of those. Attackers don't follow your checklist.${N}"
+    echo ""
+    _da_center "${Y}${BD}  MITRE ATT&CK:${N}"
     _da_center "${DIM}    T1546.004 - Event Triggered: Unix Shell Config${N}"
-    _da_center "${DIM}    ~/.ssh/rc - Executed by sshd on every login${N}"
-    _da_center "${DIM}    No cron, no .bashrc, no .profile, no systemd${N}"
+    _da_center "${DIM}    T1547.001 - Boot/Logon Autostart Execution${N}"
     echo ""
     _da_center "${Y}${BD}  Detection:${N}"
-    _da_center "${DIM}    - File integrity monitoring on ~/.ssh/*${N}"
-    _da_center "${DIM}    - Audit rules: auditctl -w ~/.ssh/rc -p wa${N}"
-    _da_center "${DIM}    - Process tree inspection post-login${N}"
-    _da_center "${DIM}    - ls -la ~/.ssh/ (most people never look)${N}"
+    _da_center "${DIM}    - find ~ -name '*.sh' -newer /etc/passwd${N}"
+    _da_center "${DIM}    - auditctl -w ~/.ssh/rc -w ~/.bash_login -p wa${N}"
+    _da_center "${DIM}    - grep -r PROMPT_COMMAND ~/.*${N}"
+    _da_center "${DIM}    - ls -la /etc/profile.d/ (look for dot-prefixed)${N}"
+    _da_center "${DIM}    - Process tree: ps auxf | grep \$\$${N}"
     echo ""
     _da_center "${G}${BD}============================================${N}"
     _da_center "${DG}  \"The only system that is truly secure is one${N}"
