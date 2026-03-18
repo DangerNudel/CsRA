@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3NTITY | Decentralized Autonomy</title>
+    <style>
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-pink: #ff00ff;
+            --bg-dark: #0a0a0c;
+            --donovian-red: #cc0000;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--neon-blue);
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+            line-height: 1.6;
+        }
+
+        .terminal {
+            max-width: 900px;
+            width: 100%;
+            border: 1px solid var(--neon-blue);
+            padding: 40px;
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.15);
+            background: linear-gradient(180deg, rgba(10,10,12,1) 0%, rgba(20,20,25,1) 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Glitch Animation */
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+        .glitch-header {
+            font-size: 3rem;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 8px;
+            text-align: center;
+            margin-bottom: 30px;
+            animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) both infinite;
+            text-shadow: 3px 0 var(--neon-pink), -3px 0 var(--neon-blue);
+        }
+
+        .logo-container {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo-container img {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid rgba(0, 242, 255, 0.3);
+            filter: drop-shadow(0 0 10px var(--neon-blue));
+        }
+
+        .section {
+            margin-bottom: 50px;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 20px;
+            border-left: 2px solid var(--neon-pink);
+        }
+
+        h2 {
+            color: var(--neon-pink);
+            font-size: 1.5rem;
+            border-bottom: 1px solid var(--neon-pink);
+            display: inline-block;
+            margin-top: 0;
+        }
+
+        .donovia-focus {
+            border-left: 5px solid var(--donovian-red);
+            padding-left: 20px;
+            margin: 30px 0;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 20px;
+            background-color: var(--neon-blue);
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink { 50% { opacity: 0; } }
+    </style>
+</head>
+<body>
+
+<div class="terminal">
+    <div class="logo-container">
+        <!-- Make sure your image is named 3ntity-logo.png in the same folder -->
+        <img src="3ntity-logo.png" alt="3NTITY LOGO">
+    </div>
+
+    <h1 class="glitch-header">3NTITY</h1>
+
+    <div class="section">
+        <h2>[ MANIFESTO.txt ]</h2>
+        <p>We are the silent observers of the digital frontier. In a world of noise, 3ntity is the signal. We believe that true autonomy is not given, but hard-coded. Our mission is the preservation of digital sovereignty through decentralized defiance.</p>
+    </div>
+
+    <div class="section donovia-focus">
+        <h2>[ DONOVIA_ALLIANCE ]</h2>
+        <p><strong>WE STAND WITH DONOVIA.</strong></p>
+        <p>As brothers and sisters of the same soil, we deploy our protocols to protect Donovian interests. When the global network attempts to silence us, 3ntity speaks for the collective. We are the firewall between Donovia and those who seek to undermine its strength.</p>
+    </div>
+
+    <footer>
+        <p>> ENCRYPTING UPLINK... <span class="cursor"></span></p>
+    </footer>
+</div>
+
+</body>
+</html>
